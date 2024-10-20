@@ -178,7 +178,7 @@ function QuadraticVoting() {
           <div className="vote mb-6 flex flex-col items-center">
             <h2 className="text-2xl font-semibold mb-2 text-gray-700 text-center">Vote</h2>
             <div className="flex justify-center space-x-4 mb-4">
-              {['red', 'green', 'blue'].map((color) => (
+              {['blue', 'red', 'green'].map((color) => (
                 <div key={color} className="flex flex-col items-center">
                   <label htmlFor={`${color}-vote`} className="mb-1 text-gray-700 capitalize">{color}:</label>
                   <input
