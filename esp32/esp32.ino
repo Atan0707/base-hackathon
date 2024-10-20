@@ -49,7 +49,7 @@ void setup() {
 
 void loop() {
   int buttonState = digitalRead(BUTTON_PIN);
-  Serial.println(buttonState);
+  
   if (WiFi.status() == WL_CONNECTED) {
     // Send GET request
     HTTPClient httpGet;
@@ -69,8 +69,10 @@ void loop() {
       timeRed = doc["timeRed"];
       timeGreen = doc["timeGreen"];
 
-      // Control LEDs based on time values
-      controlLEDs();
+      // Control LEDs based on time values only if button is pressed
+      if (buttonState == LOW) {  // Button is pressed (assuming active LOW)
+        controlLEDs();
+      }
     } else {
       Serial.print("GET request failed with status code ");
       Serial.println(httpCodeGet);
