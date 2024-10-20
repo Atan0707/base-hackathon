@@ -13,8 +13,6 @@ One of the key challenges we’re addressing in our community is the complexity 
 
 Quadratic voting is about more than just money or funding; it’s a powerful tool for democratizing decision-making in real-world systems. For instance, we’re exploring its use to make smart cities more responsive to citizens' needs by allowing people to express varying intensities of preference on issues like energy management, environmental monitoring, and public services. This can fundamentally shift how we allocate resources in IoT-powered infrastructure, ensuring more equitable participation.
 
-Additionally, in decentralized governance, where token-weighted voting often leads to centralization, QV provides a mechanism to empower minority voices without undermining broader consensus. It offers fairer decision-making in DAOs, supply chain management, and even decentralized content moderation, ensuring the community's interests are truly represented.
-
 ## How does it work
 
 ![Screenshot 2024-10-21 000811](https://github.com/user-attachments/assets/2639804c-906f-4791-801d-414eb350e62c)
