@@ -1,5 +1,5 @@
 #include <ArduinoJson.h>
-#include <ArduinoJson.hpp>
+// #include <ArduinoJson.hpp>
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -7,6 +7,9 @@
 #include <ESPAsyncWebServer.h>
 
 #define greenPin 2
+#define redPin 4
+#define bluePin 5
+#define BUTTON_PIN 18 // GPIO18 pin connected to button
 
 const char* ssid = "uba-arduino-2.4G"; //uba-arduino-2.4G / Atan
 const char* password = "izhanhebat123"; //izhanhebat123 / atan1234
@@ -14,11 +17,16 @@ const char* password = "izhanhebat123"; //izhanhebat123 / atan1234
 AsyncWebServer server(80);
 char data[50];
 
-bool state;
+float timeBlue;
+float timeRed;
+float timeGreen;
 
 void setup() {
   Serial.begin(115200);
   pinMode(greenPin, OUTPUT);
+  pinMode(redPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 
   // Connect to WiFi
   WiFi.begin(ssid, password);
@@ -40,14 +48,15 @@ void setup() {
 }
 
 void loop() {
+  int buttonState = digitalRead(BUTTON_PIN);
   
   if (WiFi.status() == WL_CONNECTED) {
-      // Send GET request
-      HTTPClient httpGet;
-      httpGet.begin("http://192.168.1.2:3000/state"); //172.20.10.12 / 192.168.1.2
-      int httpCodeGet = httpGet.GET();
+    // Send GET request
+    HTTPClient httpGet;
+    httpGet.begin("https://base-hackathon-api.vercel.app/getTimes");
+    int httpCodeGet = httpGet.GET();
 
-      if (httpCodeGet > 0) {
+    if (httpCodeGet > 0) {
       String payloadGet = httpGet.getString();
       Serial.print("Payload get: ");
       Serial.println(payloadGet);
@@ -55,20 +64,53 @@ void loop() {
       DynamicJsonDocument doc(1024);
       deserializeJson(doc, payloadGet);
 
-      // Corrected: Removed 'int' to use the global 'value' variable
-      state = doc["state"]; // Method to extract data from JSON
+      // Extract time values from JSON
+      timeBlue = doc["timeBlue"];
+      timeRed = doc["timeRed"];
+      timeGreen = doc["timeGreen"];
+
+      // Control LEDs based on time values only if button is pressed
+      if (buttonState == LOW) {  // Button is pressed (assuming active LOW)
+        controlLEDs();
+      }
     } else {
       Serial.print("GET request failed with status code ");
       Serial.println(httpCodeGet);
     }
     httpGet.end();
+    
+    delay(1000); // Delay before next API request
+  }
+}
 
-    if (state) {
-      digitalWrite(greenPin, HIGH);
-    } else {
+void controlLEDs() {
+  // Turn on all LEDs
+  digitalWrite(bluePin, HIGH);
+  digitalWrite(redPin, HIGH);
+  digitalWrite(greenPin, HIGH);
+
+  // Calculate the maximum time
+  float maxTime = max(timeBlue, max(timeRed, timeGreen));
+
+  // Start time
+  unsigned long startTime = millis();
+
+  // Keep the LEDs on for their respective durations
+  while (millis() - startTime < maxTime * 1000) {
+    if (millis() - startTime >= timeBlue * 1000) {
+      digitalWrite(bluePin, LOW);
+    }
+    if (millis() - startTime >= timeRed * 1000) {
+      digitalWrite(redPin, LOW);
+    }
+    if (millis() - startTime >= timeGreen * 1000) {
       digitalWrite(greenPin, LOW);
     }
-    
-    delay(1000);                  // Delay to avoid multiple counts for one pushup
+    delay(10); // Small delay to prevent excessive looping
   }
+
+  // Ensure all LEDs are turned off
+  digitalWrite(bluePin, LOW);
+  digitalWrite(redPin, LOW);
+  digitalWrite(greenPin, LOW);
 }
