@@ -4,60 +4,54 @@ import LEDQuadraticVoting from '../../contract/LEDQuadraticVoting.json'
 
 const contractABI = LEDQuadraticVoting.abi; 
 const contractAddress = "0xB024AB06A8c64684EE44fE78904edb29e02862f6";
+const rpcURL = "https://sepolia.base.org";
 
 function QuadraticVoting() {
-  const [contract, setContract] = useState(null);
   const [account, setAccount] = useState(null);
-  const [votes, setVotes] = useState({ red: 0, green: 0, blue: 0 });
-  const [results, setResults] = useState({ red: 0, green: 0, blue: 0 });
-  const [cycleEnded, setCycleEnded] = useState(false);
-  const [cycleEndTime, setCycleEndTime] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [contract, setContract] = useState(null);
+  const [voteEndTime, setVoteEndTime] = useState(null);
+  const [currentBlockTimestamp, setCurrentBlockTimestamp] = useState(null);
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [cycleStatus, setCycleStatus] = useState(null);
+  const [blueVotes, setBlueVotes] = useState(0);
+  const [redVotes, setRedVotes] = useState(0);
+  const [greenVotes, setGreenVotes] = useState(0);
+  const [timeBlue, setTimeBlue] = useState(0);
+  const [timeRed, setTimeRed] = useState(0);
+  const [timeGreen, setTimeGreen] = useState(0);
+  const [votes, setVotes] = useState({ blue: 0, red: 0, green: 0 });
+  const [votesLeft, setVotesLeft] = useState(10);
 
   useEffect(() => {
-    connectWallet();
+    getTime();
+    getCurrentStatus();
+    getResult();
+
+    const timer = setInterval(() => {
+      getTime();
+      getCurrentStatus();
+      getResult();
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (contract) {
-      getCycleEndTime();
-      checkCycleStatus();
-      getResults(); // Get initial results
-
-      const timer = setInterval(() => {
-        updateTimeRemaining();
-        checkCycleStatus();
-        setTimeRemaining(prevTime => {
-          if (prevTime <= 1) {
-            setCycleEnded(true);
-            clearInterval(timer);
-            return 0;
-          }
-          return prevTime - 1;
-        });
-        getResults(); // Update results every second
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [contract]);
-
   const connectWallet = async () => {
-    if (typeof window.ethereum !== 'undefined') {
+    if (window.ethereum) {
       try {
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const provider = await new ethers.BrowserProvider(window.ethereum);
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
-        const address = await signer.getAddress();
-        setAccount(address);
+        // const address = await signer.getAddress();
+        setAccount(accounts[0]);
 
         const contractInstance = new ethers.Contract(contractAddress, contractABI, signer);
         setContract(contractInstance);
       } catch (error) {
-        console.error("Failed to connect wallet:", error);
+        console.error("Fail to connect wallet: ", error);
       }
     }
-  };
+  }
 
   const handleVote = async () => {
     if (!contract) return;
@@ -67,145 +61,163 @@ function QuadraticVoting() {
       alert("Vote submitted successfully!");
     } catch (error) {
       console.error("Error voting:", error);
-      alert("Error voting. Check console for details.");
+      alert("Countdown ended. Reset to vote.");
     }
   };
+
+  const getTime = async () => {
+    const provider = new ethers.JsonRpcProvider(rpcURL);
+    const contractInstance = new ethers.Contract(contractAddress, contractABI, provider);
+    const time = await contractInstance.cycleEndTime();
+    setVoteEndTime(time.toString());
+    const latestBlock = await provider.getBlock('latest');
+    const blockTimestamp = BigInt(latestBlock.timestamp);
+    setCurrentBlockTimestamp(blockTimestamp.toString());
+    // console.log("Current time: ", time.toString());
+    // console.log("Current block timestamp: ", blockTimestamp.toString());
+    
+    const timeRemaining = BigInt(Math.max(0, Number(time - blockTimestamp)));
+    setTimeRemaining(timeRemaining.toString());
+    // console.log("Time remaining: ", timeRemaining.toString());
+  }
+
+  const getCurrentStatus = async () => {
+    const provider = new ethers.JsonRpcProvider(rpcURL);
+    const contractInstance = new ethers.Contract(contractAddress, contractABI, provider);
+    const status = await contractInstance.isCycleEnded();
+    setCycleStatus(status);
+  }
 
   const calculateResult = async () => {
-    const result = await contract.getResult();
+    if (!contract) return;
+    try {
+      const result = await contract.getResult();
+      await result.wait();
+      alert("Result calculated successfully!");
+      console.log("Result: ", result);
+    } catch (error) {
+      console.error("Failed to calculate result: ", error);
+    }
   }
-  const getResults = async () => {
+
+  const getResult = async () => {
+    const provider = new ethers.JsonRpcProvider(rpcURL);
+    const contractInstance = new ethers.Contract(contractAddress, contractABI, provider);
+    const blueVotes = await contractInstance.voteBLUE();
+    const redVotes = await contractInstance.voteRED();
+    const greenVotes = await contractInstance.voteGREEN();
+    setBlueVotes(blueVotes.toString());
+    setRedVotes(redVotes.toString());
+    setGreenVotes(greenVotes.toString());
+
+    let timeBlue = await contractInstance.timeBLUE();
+    let timeRed = await contractInstance.timeRED();
+    let timeGreen = await contractInstance.timeGREEN();
+    const toSeconds = (bigNumber) => (parseFloat(ethers.formatUnits(bigNumber, 18)).toFixed(2)) / 1e18;
+    timeBlue = toSeconds(timeBlue);
+    timeRed = toSeconds(timeRed);
+    timeGreen = toSeconds(timeGreen);
+    
+    setTimeBlue(timeBlue.toString());
+    setTimeRed(timeRed.toString());
+    setTimeGreen(timeGreen.toString());
+  }
+
+  const handleVoteChange = (color, value) => {
+    const newValue = Math.max(0, Math.min(value, votesLeft + votes[color]));
+    const newVotes = { ...votes, [color]: newValue };
+    const totalVotes = Object.values(newVotes).reduce((sum, v) => sum + v, 0);
+    setVotes(newVotes);
+    setVotesLeft(10 - totalVotes);
+  };
+
+  const resetVote = async () => {
     if (!contract) return;
-    try {
-      // const result = await contract.getResult();
-      const red = await contract.timeRED();
-      const green = await contract.timeGREEN();
-      const blue = await contract.timeBLUE();
-      
-      // Convert the results from wei to seconds
-      const toSeconds = (bigNumber) => (parseFloat(ethers.formatUnits(bigNumber, 18)).toFixed(2)) / 1e18;
-      
-      setResults({
-        red: toSeconds(red),
-        green: toSeconds(green),
-        blue: toSeconds(blue)
-      });
-      console.log(red);
-    } catch (error) {
-      console.error("Error getting results:", error);
-    }
-  };
-
-  const resetCycle = async () => {
-    if (!contract) return;
-    try {
-      const tx = await contract.reset();
-      await tx.wait();
-      alert("Voting cycle reset successfully!");
-      setCycleEnded(false);
-      getCycleEndTime();
-      setTimeRemaining(60);
-    } catch (error) {
-      console.error("Error resetting cycle:", error);
-      alert("Error resetting cycle. Check console for details.");
-    }
-  };
-
-  const getCycleEndTime = async () => {
-    if (!contract) return;
-    try {
-      const endTime = await contract.cycleEndTime();
-      setCycleEndTime(endTime);
-    } catch (error) {
-      console.error("Error getting cycle end time:", error);
-    }
-  };
-
-  const updateTimeRemaining = () => {
-    if (cycleEndTime) {
-      const now = Math.floor(Date.now() / 1000);
-      const remaining = cycleEndTime - now;
-      setTimeRemaining(remaining > 0 ? remaining : 0);
-    }
-  };
-
-  const checkCycleStatus = async () => {
-    if (!contract) return;
-    try {
-      const ended = await contract.isCycleEnded();
-      setCycleEnded(ended);
-    } catch (error) {
-      console.error("Error checking cycle status:", error);
-    }
-  };
-
-  const formatTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
+    await contract.reset();
+    await contract.reset().wait();
+    alert("Vote reset successfully!");
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
-      <div className="relative py-3 sm:max-w-xl sm:mx-auto">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-light-blue-500 shadow-lg transform -skew-y-6 sm:skew-y-0 sm:-rotate-6 sm:rounded-3xl"></div>
-        <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
-          <h1 className="text-4xl font-bold mb-5 text-center text-gray-800">LED Quadratic Voting</h1>
-          {!account ? (
-            <button onClick={connectWallet} className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300">Connect Wallet</button>
-          ) : (
-            <>
-              <p className="mb-4 text-sm text-gray-600">Connected Account: <span className="font-mono">{account}</span></p>
-              <div className="mb-6">
-                <h2 className="text-2xl font-semibold mb-2 text-gray-700">Voting Cycle</h2>
-                <p className="text-gray-600">Time Remaining: <span className="font-bold">{timeRemaining !== null ? formatTime(timeRemaining) : 'Loading...'}</span></p>
-                <p className="text-gray-600">Cycle Status: <span className={`font-bold ${cycleEnded ? 'text-red-600' : 'text-green-600'}`}>{cycleEnded ? 'Ended' : 'Active'}</span></p>
-              </div>
-              <div className="mb-6">
-                <h2 className="text-2xl font-semibold mb-2 text-gray-700">Vote</h2>
-                <div className="space-y-4 mb-4">
-                  {['red', 'green', 'blue'].map((color) => (
-                    <div key={color} className="flex flex-col">
-                      <label htmlFor={`${color}-vote`} className="mb-1 text-gray-700 capitalize">{color}:</label>
-                      <input
-                        id={`${color}-vote`}
-                        type="number"
-                        value={votes[color]}
-                        onChange={(e) => setVotes({ ...votes, [color]: parseInt(e.target.value) })}
-                        placeholder={`${color.charAt(0).toUpperCase() + color.slice(1)} votes`}
-                        className="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  ))}
+    <div className='min-h-screen bg-gray py-6 flex flex-col justify-center'>
+      <h1 className='text-center text-4xl font-bold text-gray-900'>Quadratic Voting Simulator</h1>
+      {!account ? (
+        <button onClick={connectWallet} className='mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mx-auto'>Connect Wallet</button>
+      ) : (
+        <div className="items-center">
+          <div className="account flex justify-center">
+            <p className="mb-4 text-sm text-gray-600">Connected Account: <span className="font-mono">{account}</span></p>
+          </div>
+          <div className="status flex justify-center">
+            <p className="mb-4 text-sm text-gray-600">
+              Cycle Status: 
+              <span className={`font-mono ${cycleStatus ? "text-red-600" : "text-green-600"}`}>
+                {cycleStatus ? " Ended" : " Open"}
+              </span>
+            </p>
+          </div>
+          <div className="time flex justify-center">
+            <p className="mb-4 text-sm text-gray-600">Time Remaining: <span className="font-mono">{timeRemaining}</span></p>
+          </div>
+          <div className="vote mb-6 flex flex-col items-center">
+            <h2 className="text-2xl font-semibold mb-2 text-gray-700 text-center">Vote</h2>
+            <div className="flex justify-center space-x-4 mb-4">
+              {['red', 'green', 'blue'].map((color) => (
+                <div key={color} className="flex flex-col items-center">
+                  <label htmlFor={`${color}-vote`} className="mb-1 text-gray-700 capitalize">{color}:</label>
+                  <input
+                    id={`${color}-vote`}
+                    type="number"
+                    value={votes[color]}
+                    onChange={(e) => handleVoteChange(color, parseInt(e.target.value) || 0)}
+                    min="0"
+                    max={votesLeft + votes[color]}
+                    className="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-24"
+                  />
                 </div>
-                <button onClick={handleVote} disabled={cycleEnded} className="w-full py-2 px-4 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
-                  Vote
-                </button>
-              </div>
-              <div className="mb-6">
-                <h2 className="text-2xl font-semibold mb-2 text-gray-700">Results</h2>
-                <button onClick={calculateResult} className="w-full py-2 px-4 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition duration-300 mb-2">
-                  Get Results
-                </button>
-                <div className="grid grid-cols-3 gap-2">
-                  {['red', 'green', 'blue'].map((color) => (
-                    <div key={color} className={`p-2 rounded-md bg-${color}-100 text-${color}-800`}>
-                      <p className="font-semibold">{color.charAt(0).toUpperCase() + color.slice(1)}</p>
-                      <p>{results[color]} seconds</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h2 className="text-2xl font-semibold mb-2 text-gray-700">Reset Cycle</h2>
-                <button onClick={resetCycle} disabled={!cycleEnded} className="w-full py-2 px-4 bg-red-600 text-white rounded-md hover:bg-red-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
-                  Reset Voting Cycle
-                </button>
-              </div>
-            </>
-          )}
+              ))}
+            </div>
+            <div className="vote-left">
+              <p className="text-sm text-gray-600">Votes left: <span className="font-bold">{votesLeft}</span></p>
+            </div>
+            <button 
+              onClick={handleVote} 
+              className="mt-4 hover:text-blue-900 hover:border-blue-900 duration-100 text-black font-bold py-2 px-4 rounded border border-black mx-auto"
+              disabled={votesLeft !== 0}
+            >
+              Submit Vote
+            </button>
+          </div>
+          <div className="calculate-result flex justify-center m-2">
+            <button onClick={calculateResult} className=' hover:text-blue-900 hover:border-blue-900 duration-100 text-amber-900 font-bold py-2 px-4 rounded border border-black mx-auto'>Calculate Result</button>
+          </div>
+          <div className="result flex flex-col items-center">
+            <h2 className="text-center font-bold text-gray-900 mb-2">Quadratic Voting Result (Quadratic Voting applied)</h2>
+            <div className="flex justify-center gap-4">
+              <p className="mb-2 text-sm text-gray-600">Blue Votes: <span className="font-mono">{blueVotes}</span></p>
+              <p className="mb-2 text-sm text-gray-600">Red Votes: <span className="font-mono">{redVotes}</span></p>
+              <p className="mb-2 text-sm text-gray-600">Green Votes: <span className="font-mono">{greenVotes}</span></p>
+            </div>
+            
+          </div>
+          <div className="time-distribution flex flex-col items-center">
+            <h2 className="text-center font-bold text-gray-900 mb-2">Time Distribution</h2>
+            <h3 className=" text-xs text-center font-bold text-gray-600 ">QV/QF Formula</h3>
+            <p className="text-xs text-gray-600">M * (Σ√Vi)</p>
+            <p className="text-xs text-gray-500 mt-1">Where:</p>
+            <p className="text-xs text-gray-500">M = Matching Pool</p>
+            <p className="text-xs text-gray-500">Vi = Votes for each project</p>
+            <div className="flex justify-center gap-4 mt-2">
+              <p className="text-sm text-gray-600">Blue: <span className="font-mono">{timeBlue} seconds</span></p>
+              <p className="text-sm text-gray-600">Red: <span className="font-mono">{timeRed} seconds</span></p>
+              <p className="text-sm text-gray-600">Green: <span className="font-mono">{timeGreen} seconds</span></p>
+            </div>
+          </div>
+          <div className="reset flex justify-center">
+            <button onClick={resetVote} className='mt-4 hover:text-blue-900 hover:border-blue-900 duration-100 text-black font-bold py-2 px-4 rounded border border-black mx-auto'>Reset</button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
