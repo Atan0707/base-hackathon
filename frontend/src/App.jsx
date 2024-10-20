@@ -124,7 +124,7 @@ function QuadraticVoting() {
 
     // Send the time values to the Express server
     try {
-      const response = await fetch('http://localhost:3000/updateTimes', {
+      const response = await fetch('https://base-hackathon-api.vercel.app/updateTimes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
