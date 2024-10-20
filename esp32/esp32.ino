@@ -82,18 +82,33 @@ void loop() {
 }
 
 void controlLEDs() {
-  // Blue LED
+  // Turn on all LEDs
   digitalWrite(bluePin, HIGH);
-  delay(timeBlue * 1000); // Convert to milliseconds
-  digitalWrite(bluePin, LOW);
-
-  // Red LED
   digitalWrite(redPin, HIGH);
-  delay(timeRed * 1000); // Convert to milliseconds
-  digitalWrite(redPin, LOW);
-
-  // Green LED
   digitalWrite(greenPin, HIGH);
-  delay(timeGreen * 1000); // Convert to milliseconds
+
+  // Calculate the maximum time
+  float maxTime = max(timeBlue, max(timeRed, timeGreen));
+
+  // Start time
+  unsigned long startTime = millis();
+
+  // Keep the LEDs on for their respective durations
+  while (millis() - startTime < maxTime * 1000) {
+    if (millis() - startTime >= timeBlue * 1000) {
+      digitalWrite(bluePin, LOW);
+    }
+    if (millis() - startTime >= timeRed * 1000) {
+      digitalWrite(redPin, LOW);
+    }
+    if (millis() - startTime >= timeGreen * 1000) {
+      digitalWrite(greenPin, LOW);
+    }
+    delay(10); // Small delay to prevent excessive looping
+  }
+
+  // Ensure all LEDs are turned off
+  digitalWrite(bluePin, LOW);
+  digitalWrite(redPin, LOW);
   digitalWrite(greenPin, LOW);
 }
