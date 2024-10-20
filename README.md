@@ -26,3 +26,4 @@ How long the LED will be turned on depends on the quadratic voting equation on c
 ## The fun of the project
 
 Everything you see there is onchain! Even the time is calculated using blockchain data in real-time. HAHAHAH What a fun project tbh. 
+Project link: https://base-hackathon-eight.vercel.app/
