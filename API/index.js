@@ -21,7 +21,11 @@ app.get('/getTimes', (req, res) => {
   res.json(currentTimes);
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Remove the following lines:
+// const PORT = process.env.PORT || 3000;
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
+
+// Add this line at the end of the file:
+module.exports = app;
