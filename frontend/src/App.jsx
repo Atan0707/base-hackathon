@@ -121,6 +121,22 @@ function QuadraticVoting() {
     setTimeBlue(timeBlue.toString());
     setTimeRed(timeRed.toString());
     setTimeGreen(timeGreen.toString());
+
+    // Send the time values to the Express server
+    try {
+      const response = await fetch('http://localhost:3000/updateTimes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ timeBlue, timeRed, timeGreen }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update times on server');
+      }
+    } catch (error) {
+      console.error('Error updating times:', error);
+    }
   }
 
   const handleVoteChange = (color, value) => {
