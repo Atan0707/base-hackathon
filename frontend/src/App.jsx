@@ -124,7 +124,7 @@ function QuadraticVoting() {
 
     // Send the time values to the Express server
     try {
-      const response = await fetch('http://localhost:3000/updateTimes', {
+      const response = await fetch('https://base-hackathon-api.vercel.app/updateTimes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,7 +158,7 @@ function QuadraticVoting() {
     <div className='min-h-screen bg-gray py-6 flex flex-col justify-center'>
       <h1 className='text-center text-4xl font-bold text-gray-900'>Quadratic Voting Simulator</h1>
       {!account ? (
-        <button onClick={connectWallet} className='mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mx-auto'>Connect Wallet</button>
+        <button onClick={connectWallet} className='mt-4 hover:text-blue-900 hover:border-blue-900 duration-100 text-black font-bold py-2 px-4 rounded border border-black mx-auto'>Connect Wallet</button>
       ) : (
         <div className="items-center">
           <div className="account flex justify-center">
